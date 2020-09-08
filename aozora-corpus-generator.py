@@ -26,6 +26,10 @@ def parse_args():
         epilog=textwrap.dedent('''Example usage:
 python aozora-corpus-generator.py --features 'orth' --author-title-csv 'author-title.csv' --out 'Corpora/Japanese' --parallel''')
     )
+    parser.add_argument('--tokenize',
+                        default=False,
+                        action='store_true',
+                        help='If the corpus should be tokenized as well. If false, Mecab is not a dependency.')
     parser.add_argument('--features',
                         nargs='+',
                         help='specify which features should be extracted from morphemes (default=\'orth\')',
@@ -149,6 +153,7 @@ if __name__ == '__main__':
             futures = [executor.submit(convert_corpus_file,
                                        corpus, file_name, file_path,
                                        args['out'], gaiji_tr,
+                                       args['tokenize'],
                                        args['features'],
                                        args['no_punc'],
                                        args['speech_mode'],
@@ -176,6 +181,7 @@ if __name__ == '__main__':
                 file_path,
                 args['out'],
                 gaiji_tr,
+                args['tokenize'],
                 args['features'],
                 args['no_punc'],
                 args['speech_mode'],

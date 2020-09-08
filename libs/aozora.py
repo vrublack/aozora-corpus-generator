@@ -521,7 +521,7 @@ def remove_from(s, pattern):
         return s
 
 
-def read_aozora_bunko_xml(path, gaiji_tr, features, no_punc, speech_mode,
+def read_aozora_bunko_xml(path, gaiji_tr, should_tokenize, features, no_punc, speech_mode,
                           features_separator, opening_delim, closing_delim):
     '''
     Reads an Aozora Bunko XHTML/HTML file and converts it into plain
@@ -576,17 +576,20 @@ def read_aozora_bunko_xml(path, gaiji_tr, features, no_punc, speech_mode,
     text = re.sub(r'[\r\n]+', '\n', ''.join(body.itertext()).strip(), flags=re.MULTILINE)
     text = remove_from(text, r'^[　【]?(底本：|訳者あとがき|この翻訳は|この作品.*翻訳|この翻訳.*全訳)')
 
-    paragraphs = [list(tokenize(paragraph,
-                                features,
-                                no_punc=no_punc,
-                                speech_mode=speech_mode,
-                                features_separator=features_separator,
-                                opening_delim=opening_delim,
-                                closing_delim=closing_delim))
-                  for paragraph in text.splitlines()]
-    token_count = sum(len(sentence)
-                      for paragraph in paragraphs
-                      for sentence in paragraph)
+    if should_tokenize:
+        paragraphs = [list(tokenize(paragraph,
+                                    features,
+                                    no_punc=no_punc,
+                                    speech_mode=speech_mode,
+                                    features_separator=features_separator,
+                                    opening_delim=opening_delim,
+                                    closing_delim=closing_delim))
+                      for paragraph in text.splitlines()]
+        token_count = sum(len(sentence)
+                          for paragraph in paragraphs
+                          for sentence in paragraph)
+    else:
+        paragraphs, token_count = None, None
 
     return text, paragraphs, token_count
 
@@ -596,15 +599,17 @@ def write_corpus_file(text, paragraphs, file_name, prefix):
     Given a sequence of paragraphs and path to output, writes plain
     and tokenized versions of the paragraphs.
     '''
-    with open('{}/Tokenized/{}.txt'.format(prefix, file_name), 'w') as f_tokenized, \
-         open('{}/Plain/{}.txt'.format(prefix, file_name), 'w') as f_plain:
+    with open('{}/Plain/{}.txt'.format(prefix, file_name), 'w') as f_plain:
         f_plain.write(text)
-        for paragraph in paragraphs:
-            f_tokenized.write('<PGB>\n'.join('\n'.join(sentence) + '\n<EOS>\n'
-                                             for sentence in paragraph))
+
+    if paragraphs is not None:
+        with open('{}/Tokenized/{}.txt'.format(prefix, file_name), 'w') as f_tokenized:
+            for paragraph in paragraphs:
+                f_tokenized.write('<PGB>\n'.join('\n'.join(sentence) + '\n<EOS>\n'
+                                                 for sentence in paragraph))
 
 
-def convert_corpus_file(corpus, file_name, file_path, prefix, gaiji_tr,
+def convert_corpus_file(corpus, file_name, file_path, prefix, gaiji_tr, should_tokenize,
                         features=['orth'], no_punc=True, speech_mode='yes', min_tokens=False,
                         features_separator=None, opening_delim=None, closing_delim=None):
     '''
@@ -630,6 +635,7 @@ def convert_corpus_file(corpus, file_name, file_path, prefix, gaiji_tr,
             text, paragraphs, token_count = read_aozora_bunko_xml(
                 file_path,
                 gaiji_tr,
+                should_tokenize,
                 features,
                 no_punc,
                 speech_mode,
@@ -640,7 +646,7 @@ def convert_corpus_file(corpus, file_name, file_path, prefix, gaiji_tr,
         except UnicodeDecodeError as e:
             text, paragraphs, token_count = '', [], 0
             log.warn(f'Decoding of {file_path} failed with {e}')
-    reject = True if (min_tokens and token_count < min_tokens) else False
+    reject = min_tokens and token_count is not None and token_count < min_tokens
     if not reject:
         write_corpus_file(text, paragraphs, file_name, prefix)
     return file_name, file_path, prefix, token_count, reject
