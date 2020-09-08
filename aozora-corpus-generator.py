@@ -4,6 +4,7 @@ import textwrap
 import pathlib
 import concurrent.futures
 import logging
+import os.path as osp
 
 from libs.aozora import (
     make_jis_unicode_map,
@@ -44,10 +45,9 @@ python aozora-corpus-generator.py --features 'orth' --author-title-csv 'author-t
                         help='one or more UTF-8 formatted CSV input file(s) (default=\'author-title.csv\')',
                         default=['author-title.csv'],
                         required=False)
-    parser.add_argument('--aozora-bunko-repository',
-                        help='path to the aozorabunko git repository (default=\'aozorabunko/index_pages/list_person_all_extended_utf8.zip\')',
-                        default='aozorabunko/index_pages/list_person_all_extended_utf8.zip',
-                        required=False)
+    parser.add_argument('--aozora-base-dir',
+                        help='path to the aozorabunko git repository',
+                        required=True)
     parser.add_argument('--out',
                         help='output (plain, tokenized) files into given output directory (default=Corpora)',
                         default='Corpora',
@@ -95,6 +95,9 @@ python aozora-corpus-generator.py --features 'orth' --author-title-csv 'author-t
 
 
 if __name__ == '__main__':
+    def fix_path(args, path):
+        return path.replace('aozorabunko', args['aozora_base_dir'], 1)
+
     args = parse_args()
 
     if args['verbose']:
@@ -113,16 +116,17 @@ if __name__ == '__main__':
     pathlib.Path(args['out'] + '/Tokenized').mkdir(parents=True, exist_ok=True)
     pathlib.Path(args['out'] + '/Plain').mkdir(parents=True, exist_ok=True)
 
-    aozora_db = read_aozora_bunko_list(args['aozora_bunko_repository'], ndc_tr)
+    aozora_db = read_aozora_bunko_list(osp.join(args['aozora_base_dir'], 'index_pages', 'list_person_all_extended_utf8.zip'), ndc_tr)
 
     files, metadata = [], []
     if args['all']:
         for author_ja, titles in aozora_db.items():
             for title, title_dict in titles.items():
-                files.append(('Aozora Bunko', title_dict['file_name'], title_dict['file_path']))
+                path = fix_path(args, title_dict['file_path'])
+                files.append(('Aozora Bunko', title_dict['file_name'], path))
                 metadata.append({
                     'corpus': 'Aozora Bunko',
-                    'corpus_id': title_dict['file_path'],
+                    'corpus_id': path,
                     'author': title_dict['author'],
                     'title': title,
                     'brow': '',
